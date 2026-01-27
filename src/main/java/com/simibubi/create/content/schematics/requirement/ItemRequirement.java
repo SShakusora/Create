@@ -37,6 +37,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.SlabType;
+import net.minecraft.world.level.material.FluidState;
 
 public class ItemRequirement {
 	public static final ItemRequirement NONE = new ItemRequirement(Collections.emptyList());
@@ -56,8 +57,16 @@ public class ItemRequirement {
 		this(new StackRequirement(stack, usage));
 	}
 
+	public ItemRequirement(ItemUseType usage, ItemStack consume, ItemStack returnStack) {
+		this(new StackRequirement(consume, usage, returnStack));
+	}
+
 	public ItemRequirement(ItemUseType usage, Item item) {
 		this(usage, new ItemStack(item));
+	}
+
+	public ItemRequirement(ItemUseType usage, Item consume, Item returnItem) {
+		this(usage, new ItemStack(consume), new ItemStack(returnItem));
 	}
 
 	public ItemRequirement(ItemUseType usage, List<ItemStack> requiredItems) {
@@ -95,6 +104,17 @@ public class ItemRequirement {
 
 	private static ItemRequirement defaultOf(BlockState state, BlockEntity be) {
 		Block block = state.getBlock();
+		FluidState fluid = state.getFluidState();
+
+		//find bucket from fluid
+		if (!fluid.isEmpty() && fluid.isSource()) {
+			Item bucket = fluid.getType().getBucket();
+			if (bucket != Items.AIR) {
+				return new ItemRequirement(ItemUseType.CONSUME_AND_RETURN, bucket, Items.BUCKET);
+			}
+			return NONE;
+		}
+
 		if (block == Blocks.AIR)
 			return NONE;
 
@@ -186,16 +206,24 @@ public class ItemRequirement {
 	}
 
 	public enum ItemUseType {
-		CONSUME, DAMAGE
+		CONSUME, DAMAGE, CONSUME_AND_RETURN
 	}
 
 	public static class StackRequirement {
 		public final ItemStack stack;
+		public final ItemStack returnStack;
 		public final ItemUseType usage;
 
 		public StackRequirement(ItemStack stack, ItemUseType usage) {
 			this.stack = stack;
 			this.usage = usage;
+			this.returnStack = ItemStack.EMPTY;
+		}
+
+		public StackRequirement(ItemStack stack, ItemUseType usage, ItemStack returnStack) {
+			this.stack = stack;
+			this.usage = usage;
+			this.returnStack = returnStack;
 		}
 
 		public boolean matches(ItemStack other) {

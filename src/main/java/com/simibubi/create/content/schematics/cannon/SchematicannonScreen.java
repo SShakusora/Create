@@ -55,6 +55,8 @@ public class SchematicannonScreen extends AbstractSimiContainerScreen<Schematica
 
 	protected IconButton skipMissingButton;
 	protected Indicator skipMissingIndicator;
+	protected IconButton skipFluidButton;
+	protected Indicator skipFluidIndicator;
 	protected IconButton skipBlockEntitiesButton;
 	protected Indicator skipBlockEntitiesIndicator;
 
@@ -172,12 +174,20 @@ public class SchematicannonScreen extends AbstractSimiContainerScreen<Schematica
 		skipMissingIndicator = new Indicator(x + 111, y + 111, CommonComponents.EMPTY);
 		Collections.addAll(placementSettingWidgets, skipMissingButton);
 
-		skipBlockEntitiesButton = new IconButton(x + 135, y + 111, AllIcons.I_SKIP_BLOCK_ENTITIES);
+		skipFluidButton = new IconButton(x + 129, y + 111, AllIcons.I_SKIP_FLUID);
+		skipFluidButton.withCallback(() -> {
+			sendOptionUpdate(Option.SKIP_FLUID, !menu.contentHolder.skipFluid);
+		});
+		skipFluidButton.setToolTip(CreateLang.translateDirect("gui.schematicannon.option.skipFluid"));
+		skipFluidIndicator = new Indicator(x + 129, y + 111, CommonComponents.EMPTY);
+		Collections.addAll(placementSettingWidgets, skipFluidButton);
+
+		skipBlockEntitiesButton = new IconButton(x + 147, y + 111, AllIcons.I_SKIP_BLOCK_ENTITIES);
 		skipBlockEntitiesButton.withCallback(() -> {
 			sendOptionUpdate(Option.SKIP_BLOCK_ENTITIES, !menu.contentHolder.replaceBlockEntities);
 		});
 		skipBlockEntitiesButton.setToolTip(CreateLang.translateDirect("gui.schematicannon.option.skipBlockEntities"));
-		skipBlockEntitiesIndicator = new Indicator(x + 129, y + 111, CommonComponents.EMPTY);
+		skipBlockEntitiesIndicator = new Indicator(x + 147, y + 111, CommonComponents.EMPTY);
 		Collections.addAll(placementSettingWidgets, skipBlockEntitiesButton);
 
 		addRenderableWidgets(placementSettingWidgets);
@@ -199,6 +209,7 @@ public class SchematicannonScreen extends AbstractSimiContainerScreen<Schematica
 				replaceLevelIndicators.get(replaceMode).state = replaceMode == be.replaceMode ? State.ON : State.OFF;
 			}
 			skipMissingButton.green = be.skipMissing;
+			skipFluidButton.green = be.skipFluid;
 			skipBlockEntitiesButton.green = !be.replaceBlockEntities;
 		}
 
@@ -249,6 +260,7 @@ public class SchematicannonScreen extends AbstractSimiContainerScreen<Schematica
 
 		if (hasShiftDown()) {
 			fillToolTip(skipMissingButton, skipMissingIndicator, "skipMissing");
+			fillToolTip(skipFluidButton, skipFluidIndicator, "skipFluid");
 			fillToolTip(skipBlockEntitiesButton, skipBlockEntitiesIndicator, "skipBlockEntities");
 			fillToolTip(replaceLevelButtons.get(0), replaceLevelIndicators.get(0), "dontReplaceSolid");
 			fillToolTip(replaceLevelButtons.get(1), replaceLevelIndicators.get(1), "replaceWithSolid");

@@ -71,6 +71,9 @@ import net.minecraft.world.phys.AABB;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidUtil;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.wrapper.EmptyItemHandler;
@@ -98,6 +101,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 
 	public BlockPos previousTarget;
 	public LinkedHashSet<IItemHandler> attachedInventories;
+	public LinkedHashSet<IFluidHandler> attachedFluidInventories;
 	public List<LaunchedItem> flyingBlocks;
 	public MaterialChecklist checklist;
 
@@ -113,6 +117,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 	// Settings
 	public int replaceMode;
 	public boolean skipMissing;
+	public boolean skipFluid;
 	public boolean replaceBlockEntities;
 
 	// Render
@@ -123,6 +128,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 		super(type, pos, state);
 		setLazyTickRate(30);
 		attachedInventories = new LinkedHashSet<>();
+		attachedFluidInventories = new LinkedHashSet<>();
 		flyingBlocks = new LinkedList<>();
 		inventory = new SchematicannonInventory(this);
 		statusMsg = "idle";
@@ -135,6 +141,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 	public void findInventories() {
 		hasCreativeCrate = false;
 		attachedInventories.clear();
+		attachedFluidInventories.clear();
 		for (Direction facing : Iterate.directions) {
 
 			if (!level.isLoaded(worldPosition.relative(facing)))
@@ -149,6 +156,11 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 					level.getCapability(Capabilities.ItemHandler.BLOCK, blockEntity.getBlockPos(), facing.getOpposite());
 				if (capability != null) {
 					attachedInventories.add(capability);
+				}
+
+				IFluidHandler fluidCap = level.getCapability(Capabilities.FluidHandler.BLOCK, blockEntity.getBlockPos(), facing.getOpposite());
+				if (fluidCap != null) {
+					attachedFluidInventories.add(fluidCap);
 				}
 			}
 		}
@@ -182,9 +194,10 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 
 		// Settings
 		SchematicannonOptions options = CatnipCodecUtils.decode(SchematicannonOptions.CODEC, registries, compound.getCompound("Options"))
-			.orElse(new SchematicannonOptions(2, false, false));
+			.orElse(new SchematicannonOptions(2, false, false,false));
 		replaceMode = options.replaceMode;
 		skipMissing = options.skipMissing;
+		skipFluid = options.skipFluid;
 		replaceBlockEntities = options.replaceBlockEntities;
 
 		// Printer & Flying Blocks
@@ -255,7 +268,7 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 			compound.put("MissingItem", missingItem.saveOptional(registries));
 
 		// Settings
-		Tag options = CatnipCodecUtils.encode(SchematicannonOptions.CODEC, registries, new SchematicannonOptions(replaceMode, skipMissing, replaceBlockEntities)).orElseThrow();
+		Tag options = CatnipCodecUtils.encode(SchematicannonOptions.CODEC, registries, new SchematicannonOptions(replaceMode, skipMissing, skipFluid, replaceBlockEntities)).orElseThrow();
 		compound.put("Options", options);
 
 		// Printer & Flying Blocks
@@ -404,6 +417,17 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 		if (!requirement.isEmpty()) {
 			for (ItemRequirement.StackRequirement required : requiredItems) {
 				if (!grabItemsFromAttachedInventories(required, true)) {
+					boolean isFluidRequirement = isFluidItem(required.stack);
+					if (isFluidRequirement && skipFluid) {
+						statusMsg = "skippingFluid";
+						blockSkipped = true;
+						if (missingItem != null) {
+							missingItem = null;
+							state = State.RUNNING;
+						}
+						return;
+					}
+
 					if (skipMissing) {
 						statusMsg = "skipping";
 						blockSkipped = true;
@@ -512,6 +536,17 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 			return true;
 
 		attachedInventories.removeIf(Objects::isNull);
+		attachedFluidInventories.removeIf(Objects::isNull);
+
+		FluidStack fluidRequirement = FluidUtil.getFluidContained(required.stack).orElse(FluidStack.EMPTY);
+
+		if (!fluidRequirement.isEmpty()) {
+			int totalAmountNeeded = fluidRequirement.getAmount() * required.stack.getCount();
+
+			if (canSatisfyFromFluidTanks(fluidRequirement, totalAmountNeeded, simulate)) {
+				return true;
+			}
+		}
 
 		ItemUseType usage = required.usage;
 
@@ -536,6 +571,34 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 								cap.insertItem(slot, stack, false);
 							else
 								ItemHandlerHelper.insertItem(cap, stack, false);
+						}
+					}
+
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		// Find and apply return
+		if (usage == ItemUseType.CONSUME_AND_RETURN) {
+			for (IItemHandler cap : attachedInventories) {
+				if (cap == null)
+					cap = EmptyItemHandler.INSTANCE;
+				for (int slot = 0; slot < cap.getSlots(); slot++) {
+					ItemStack extractItem = cap.extractItem(slot, 1, true);
+					if (!required.matches(extractItem))
+						continue;
+
+					if (!simulate) {
+						cap.extractItem(slot, 1, false);
+						ItemStack ret = required.returnStack.copy();
+
+						if (cap.getStackInSlot(slot).isEmpty()) {
+							cap.insertItem(slot, ret, false);
+						} else {
+							ItemHandlerHelper.insertItem(cap, ret, false);
 						}
 					}
 
@@ -593,6 +656,48 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 		resetPrinter();
 		AllSoundEvents.SCHEMATICANNON_FINISH.playOnServer(level, worldPosition);
 		sendUpdate = true;
+	}
+
+	private boolean canSatisfyFromFluidTanks(FluidStack resource, int amountNeeded, boolean simulate) {
+		int amountFound = 0;
+		FluidStack toDrain = new FluidStack(resource.getFluidHolder(), amountNeeded);
+
+		for (IFluidHandler tank : attachedFluidInventories) {
+			if (tank == null) continue;
+			FluidStack drained = tank.drain(toDrain, IFluidHandler.FluidAction.SIMULATE);
+			if (drained.isFluidEqual(resource)) {
+				amountFound += drained.getAmount();
+			}
+		}
+
+		if (amountFound < amountNeeded) return false;
+		if (simulate) return true;
+
+		int remainingToDrain = amountNeeded;
+		for (IFluidHandler tank : attachedFluidInventories) {
+			if (tank == null || remainingToDrain <= 0) break;
+
+			FluidStack request = new FluidStack(resource.getFluidHolder(), remainingToDrain);
+			FluidStack drained = tank.drain(request, IFluidHandler.FluidAction.EXECUTE);
+
+			remainingToDrain -= drained.getAmount();
+		}
+
+		return true;
+	}
+
+	private ItemStack getBucketForFluid(FluidStack fluidStack) {
+		return FluidUtil.getFilledBucket(fluidStack);
+	}
+
+	private boolean isFluidItem(ItemStack stack) {
+		if (stack.isEmpty()) return false;
+
+		if (FluidUtil.getFluidContained(stack).isPresent()) {
+			return true;
+		}
+
+		return false;
 	}
 
 	protected void resetPrinter() {
@@ -874,6 +979,23 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 				checklist.collect(stackInSlot);
 			}
 		}
+
+		for (IFluidHandler tank : attachedFluidInventories) {
+			if (tank == null) continue;
+			for (int tankIdx = 0; tankIdx < tank.getTanks(); tankIdx++) {
+				FluidStack fluidInTank = tank.getFluidInTank(tankIdx);
+				if (fluidInTank.isEmpty() || fluidInTank.getAmount() < 1000)
+					continue;
+
+				ItemStack fluidBucket = getBucketForFluid(fluidInTank);
+				if (!fluidBucket.isEmpty()) {
+					int bucketCount = fluidInTank.getAmount() / 1000;
+					for (int i = 0; i < bucketCount; i++) {
+						checklist.collect(fluidBucket);
+					}
+				}
+			}
+		}
 		sendUpdate = true;
 	}
 
@@ -895,32 +1017,35 @@ public class SchematicannonBlockEntity extends SmartBlockEntity implements MenuP
 	@Override
 	protected void applyImplicitComponents(DataComponentInput componentInput) {
 		SchematicannonOptions options = componentInput.getOrDefault(AllDataComponents.SCHEMATICANNON_OPTIONS,
-				new SchematicannonOptions(2, true, false));
+				new SchematicannonOptions(2, true, false,false));
 		replaceMode = options.replaceMode;
 		skipMissing = options.skipMissing;
+		skipFluid = options.skipFluid;
 		replaceBlockEntities = options.replaceBlockEntities;
 	}
 
 	@Override
 	protected void collectImplicitComponents(Builder components) {
 		components.set(AllDataComponents.SCHEMATICANNON_OPTIONS,
-			new SchematicannonOptions(replaceMode, skipMissing, replaceBlockEntities));
+			new SchematicannonOptions(replaceMode, skipMissing, skipFluid,replaceBlockEntities));
 	}
 
 	public enum State {
 		STOPPED, PAUSED, RUNNING;
 	}
 
-	public record SchematicannonOptions(int replaceMode, boolean skipMissing, boolean replaceBlockEntities) {
+	public record SchematicannonOptions(int replaceMode, boolean skipMissing, boolean skipFluid, boolean replaceBlockEntities) {
 		public static final Codec<SchematicannonOptions> CODEC = RecordCodecBuilder.create(i -> i.group(
 				Codec.INT.fieldOf("replace_mode").forGetter(SchematicannonOptions::replaceMode),
 				Codec.BOOL.fieldOf("skip_missing").forGetter(SchematicannonOptions::skipMissing),
+				Codec.BOOL.fieldOf("skip_fluid").forGetter(SchematicannonOptions::skipFluid),
 				Codec.BOOL.fieldOf("replace_block_entities").forGetter(SchematicannonOptions::replaceBlockEntities)
 		).apply(i, SchematicannonOptions::new));
 
 		public static final StreamCodec<ByteBuf, SchematicannonOptions> STREAM_CODEC = StreamCodec.composite(
 				ByteBufCodecs.INT, SchematicannonOptions::replaceMode,
 				ByteBufCodecs.BOOL, SchematicannonOptions::skipMissing,
+				ByteBufCodecs.BOOL, SchematicannonOptions::skipFluid,
 				ByteBufCodecs.BOOL, SchematicannonOptions::replaceBlockEntities,
 				SchematicannonOptions::new
 		);

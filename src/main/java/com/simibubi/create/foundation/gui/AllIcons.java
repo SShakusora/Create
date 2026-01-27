@@ -83,6 +83,7 @@ public class AllIcons implements ScreenElement {
 	public static final AllIcons
 		I_TOOL_DEPLOY = newRow(),
 		I_SKIP_MISSING = next(),
+		I_SKIP_FLUID = next(),
 		I_SKIP_BLOCK_ENTITIES = next(),
 		I_DICE = next(),
 		I_TUNNEL_SPLIT = next(),

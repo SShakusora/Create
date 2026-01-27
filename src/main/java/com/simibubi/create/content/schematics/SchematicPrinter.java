@@ -35,6 +35,7 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.material.Fluids;
 
 public class SchematicPrinter {
@@ -214,9 +215,11 @@ public class SchematicPrinter {
 
 	public boolean shouldPlaceBlock(Level world, PlacementPredicate predicate, BlockPos pos) {
 		BlockState state = BlockHelper.setZeroAge(blockReader.getBlockState(pos));
+		FluidState fluidState = state.getFluidState();
 		BlockEntity blockEntity = blockReader.getBlockEntity(pos);
 
 		BlockState toReplace = world.getBlockState(pos);
+		FluidState toReplaceFluid = toReplace.getFluidState();
 		BlockEntity toReplaceBE = world.getBlockEntity(pos);
 		BlockState toReplaceOther = null;
 
@@ -235,6 +238,8 @@ public class SchematicPrinter {
 		if (!world.getWorldBorder().isWithinBounds(pos))
 			return false;
 		if (toReplace == state && !mergeTEs)
+			return false;
+		if (!fluidState.isEmpty() && fluidState.getType() == toReplaceFluid.getType() && toReplaceFluid.isSource())
 			return false;
 		if (toReplace.getDestroySpeed(world, pos) == -1
 			|| (toReplaceOther != null && toReplaceOther.getDestroySpeed(world, pos) == -1))

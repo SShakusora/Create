@@ -15,6 +15,7 @@ import net.createmod.catnip.render.ShadedBlockSbbBuilder;
 import net.createmod.catnip.render.SuperByteBuffer;
 import net.createmod.catnip.render.SuperRenderTypeBuffer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
@@ -26,6 +27,7 @@ import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.material.FluidState;
 
 import net.neoforged.neoforge.client.model.data.ModelData;
 
@@ -34,6 +36,7 @@ public class SchematicRenderer {
 	private static final ThreadLocal<ThreadLocalObjects> THREAD_LOCAL_OBJECTS = ThreadLocal.withInitial(ThreadLocalObjects::new);
 
 	private final Map<RenderType, SuperByteBuffer> bufferCache = new LinkedHashMap<>(getLayerCount());
+	private final Map<RenderType, SuperByteBuffer> fluidBufferCache = new LinkedHashMap<>(getLayerCount());
 	private boolean changed;
 	protected final SchematicLevel schematic;
 	private final BlockPos anchor;
@@ -67,6 +70,10 @@ public class SchematicRenderer {
 		bufferCache.forEach((layer, buffer) -> {
 			buffer.renderInto(ms, buffers.getBuffer(layer));
 		});
+		fluidBufferCache.forEach((layer, buffer) -> {
+			buffer.renderInto(ms, buffers.getBuffer(layer));
+		});
+
 		scratchErroredBlockEntities.clear();
 		BlockEntityRenderHelper.renderBlockEntities(renderedBlockEntities, shouldRenderBlockEntities, scratchErroredBlockEntities, null, schematic, ms, null, buffers, AnimationTickHolder.getPartialTicks());
 
@@ -76,11 +83,16 @@ public class SchematicRenderer {
 
 	protected void redraw() {
 		bufferCache.clear();
+		fluidBufferCache.clear();
 
 		for (RenderType layer : RenderType.chunkBufferLayers()) {
 			SuperByteBuffer buffer = drawLayer(layer);
 			if (!buffer.isEmpty())
 				bufferCache.put(layer, buffer);
+
+			SuperByteBuffer fluidBuffer = drawFluids(layer);
+			if (!fluidBuffer.isEmpty())
+				fluidBufferCache.put(layer, fluidBuffer);
 		}
 	}
 
@@ -128,6 +140,37 @@ public class SchematicRenderer {
 		return sbbBuilder.end();
 	}
 
+	protected SuperByteBuffer drawFluids(RenderType layer) {
+		BlockRenderDispatcher dispatcher = Minecraft.getInstance().getBlockRenderer();
+		ThreadLocalObjects objects = THREAD_LOCAL_OBJECTS.get();
+		PoseStack poseStack = objects.poseStack;
+		SchematicLevel renderWorld = schematic;
+		BoundingBox bounds = renderWorld.getBounds();
+		BlockPos.MutableBlockPos mutable = objects.mutableBlockPos;
+
+		FluidSbbBuilder sbbBuilder = objects.fluidSbbBuilder;
+		sbbBuilder.begin();
+
+		renderWorld.renderMode = true;
+		for (BlockPos localPos : BlockPos.betweenClosed(bounds.minX(), bounds.minY(), bounds.minZ(), bounds.maxX(), bounds.maxY(), bounds.maxZ())) {
+			BlockPos pos = mutable.setWithOffset(localPos, anchor);
+			BlockState state = renderWorld.getBlockState(pos);
+			FluidState fluid = state.getFluidState();
+
+			if (fluid.isEmpty()) continue;
+			if (ItemBlockRenderTypes.getRenderLayer(fluid) != layer) continue;
+			poseStack.pushPose();
+			poseStack.translate(pos.getX() - (pos.getX() & 0xF), pos.getY() - (pos.getY() & 0xF), pos.getZ() - (pos.getZ() & 0xF));
+
+			dispatcher.renderLiquid(pos, renderWorld, sbbBuilder, state, fluid);
+
+			poseStack.popPose();
+		}
+		renderWorld.renderMode = false;
+
+		return sbbBuilder.end();
+	}
+
 	private static int getLayerCount() {
 		return RenderType.chunkBufferLayers()
 			.size();
@@ -138,6 +181,7 @@ public class SchematicRenderer {
 		public final RandomSource random = RandomSource.createNewThreadLocalInstance();
 		public final BlockPos.MutableBlockPos mutableBlockPos = new BlockPos.MutableBlockPos();
 		public final ShadedBlockSbbBuilder sbbBuilder = ShadedBlockSbbBuilder.create();
+		public final FluidSbbBuilder fluidSbbBuilder = FluidSbbBuilder.create(poseStack);
 	}
 
 }

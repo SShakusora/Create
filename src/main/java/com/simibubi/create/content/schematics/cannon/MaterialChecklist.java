@@ -52,7 +52,7 @@ public class MaterialChecklist {
 		for (ItemRequirement.StackRequirement stack : requirement.getRequiredItems()) {
 			if (stack.usage == ItemUseType.DAMAGE)
 				putOrIncrement(damageRequired, stack.stack);
-			if (stack.usage == ItemUseType.CONSUME)
+			if (stack.usage == ItemUseType.CONSUME || stack.usage == ItemUseType.CONSUME_AND_RETURN)
 				putOrIncrement(required, stack.stack);
 		}
 	}
