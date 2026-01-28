@@ -39,7 +39,7 @@ public record ConfigureSchematicannonPacket(Option option, boolean set) implemen
 				be.skipMissing = this.set;
 				break;
 			case SKIP_FLUID:
-				be.skipFluid = this.set;
+				be.skipMissingFluid = this.set;
 				break;
 			case SKIP_BLOCK_ENTITIES:
 				be.replaceBlockEntities = this.set;

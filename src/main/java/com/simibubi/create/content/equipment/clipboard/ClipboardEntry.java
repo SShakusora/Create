@@ -16,17 +16,21 @@ import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.fluids.FluidStack;
 
 public class ClipboardEntry {
 	public static final Codec<ClipboardEntry> CODEC = RecordCodecBuilder.create(i -> i.group(
 			Codec.BOOL.fieldOf("checked").forGetter(c -> c.checked),
 			ComponentSerialization.CODEC.fieldOf("text").forGetter(c -> c.text),
 			ItemStack.OPTIONAL_CODEC.fieldOf("icon").forGetter(c -> c.icon),
+			FluidStack.OPTIONAL_CODEC.fieldOf("fluid_icon").forGetter(c -> c.fluidIcon),
 			Codec.INT.fieldOf("item_amount").forGetter(c -> c.itemAmount)
-	).apply(i, (checked, text, icon, itemAmount) -> {
+	).apply(i, (checked, text, icon, fluidIcon, itemAmount) -> {
 		ClipboardEntry entry = new ClipboardEntry(checked, text.copy());
 		if (!icon.isEmpty())
 			entry.displayItem(icon, itemAmount);
+		if (!fluidIcon.isEmpty())
+			entry.displayItem(fluidIcon, itemAmount);
 
 		return entry;
 	}));
@@ -35,11 +39,14 @@ public class ClipboardEntry {
 			ByteBufCodecs.BOOL, c -> c.checked,
 			ComponentSerialization.STREAM_CODEC, c -> c.text,
 			ItemStack.OPTIONAL_STREAM_CODEC, c -> c.icon,
+			FluidStack.OPTIONAL_STREAM_CODEC, c -> c.fluidIcon,
 			ByteBufCodecs.INT, c -> c.itemAmount,
-			(checked, text, icon, itemAmount) -> {
+			(checked, text, icon, fluidIcon, itemAmount) -> {
 				ClipboardEntry entry = new ClipboardEntry(checked, text.copy());
 				if (!icon.isEmpty())
 					entry.displayItem(icon, itemAmount);
+				if (!fluidIcon.isEmpty())
+					entry.displayItem(fluidIcon, itemAmount);
 
 				return entry;
 			}
@@ -48,16 +55,26 @@ public class ClipboardEntry {
 	public boolean checked;
 	public MutableComponent text;
 	public ItemStack icon;
+	public FluidStack fluidIcon;
 	public int itemAmount;
 
 	public ClipboardEntry(boolean checked, MutableComponent text) {
 		this.checked = checked;
 		this.text = text;
 		this.icon = ItemStack.EMPTY;
+		this.fluidIcon = FluidStack.EMPTY;
 	}
 
 	public ClipboardEntry displayItem(ItemStack icon, int amount) {
 		this.icon = icon;
+		this.fluidIcon = FluidStack.EMPTY;
+		this.itemAmount = amount;
+		return this;
+	}
+
+	public ClipboardEntry displayItem(FluidStack icon, int amount) {
+		this.icon = ItemStack.EMPTY;
+		this.fluidIcon = icon;
 		this.itemAmount = amount;
 		return this;
 	}
@@ -99,7 +116,7 @@ public class ClipboardEntry {
 		if (this == o) return true;
 		if (!(o instanceof ClipboardEntry that)) return false;
 
-		return checked == that.checked && text.equals(that.text) && ItemStack.isSameItemSameComponents(icon, that.icon);
+		return checked == that.checked && text.equals(that.text) && ItemStack.isSameItemSameComponents(icon, that.icon) && FluidStack.matches(fluidIcon, that.fluidIcon);
 	}
 
 	@Override
@@ -107,6 +124,7 @@ public class ClipboardEntry {
 		int result = Boolean.hashCode(checked);
 		result = 31 * result + text.hashCode();
 		result = 31 * result + ItemStack.hashItemAndComponents(icon);
+		result = 31 * result + FluidStack.hashFluidAndComponents(fluidIcon);
 		return result;
 	}
 }

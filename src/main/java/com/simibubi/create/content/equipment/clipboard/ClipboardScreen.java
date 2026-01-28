@@ -30,6 +30,7 @@ import com.simibubi.create.foundation.utility.CreateLang;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
 import net.createmod.catnip.gui.AbstractSimiScreen;
+import net.createmod.catnip.gui.element.GuiGameElement;
 import net.createmod.catnip.platform.CatnipServices;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -288,7 +289,8 @@ public class ClipboardScreen extends AbstractSimiScreen {
 		for (int i = 0; i < currentEntries.size(); i++) {
 			ClipboardEntry clipboardEntry = currentEntries.get(i);
 			boolean checked = clipboardEntry.checked;
-			int iconOffset = clipboardEntry.icon.isEmpty() ? 0 : 16;
+			boolean hasIcon = !clipboardEntry.icon.isEmpty() || !clipboardEntry.fluidIcon.isEmpty();
+			int iconOffset = hasIcon ? 16 : 0;
 
 			MutableComponent text = clipboardEntry.text;
 			String string = text.getString();
@@ -315,6 +317,12 @@ public class ClipboardScreen extends AbstractSimiScreen {
 
 			if (!clipboardEntry.icon.isEmpty())
 				graphics.renderItem(clipboardEntry.icon, x + 54, y + 50);
+
+			if (!clipboardEntry.fluidIcon.isEmpty())
+				GuiGameElement.of(clipboardEntry.fluidIcon.getFluid()).<GuiGameElement
+						.GuiRenderBuilder>at(x + 54, y + 50 + 16, 100)
+					.scale(16)
+					.render(graphics);
 
 			for (FormattedCharSequence sequence : split) {
 				if (i != editingIndex)

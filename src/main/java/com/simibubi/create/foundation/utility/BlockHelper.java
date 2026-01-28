@@ -27,16 +27,12 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.SectionPos;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.stats.Stats;
 import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
@@ -73,6 +69,8 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.common.SpecialPlantable;
 import net.neoforged.neoforge.event.level.BlockDropsEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.FluidType;
 
 public class BlockHelper {
 	private static final List<IntegerProperty> COUNT_STATES = List.of(
@@ -317,6 +315,7 @@ public class BlockHelper {
 										   @Nullable CompoundTag data) {
 		Block block = state.getBlock();
 		BlockEntity existingBlockEntity = world.getBlockEntity(target);
+		FluidState fluidState = state.getFluidState();
 		boolean alreadyPlaced = false;
 
 		StateFilter filter = SchematicStateFilterRegistry.REGISTRY.get(state);
@@ -329,8 +328,8 @@ public class BlockHelper {
 		// Piston
 		if (state.hasProperty(BlockStateProperties.EXTENDED))
 			state = state.setValue(BlockStateProperties.EXTENDED, Boolean.FALSE);
-		if (state.hasProperty(BlockStateProperties.WATERLOGGED))
-			state = state.setValue(BlockStateProperties.WATERLOGGED, Boolean.FALSE);
+//		if (state.hasProperty(BlockStateProperties.WATERLOGGED))
+//			state = state.setValue(BlockStateProperties.WATERLOGGED, Boolean.FALSE);
 
 		if (block == Blocks.COMPOSTER) {
 			state = Blocks.COMPOSTER.defaultBlockState();
@@ -342,20 +341,21 @@ public class BlockHelper {
 			state = Blocks.CAULDRON.defaultBlockState();
 		}
 
-		if (world.dimensionType()
-			.ultraWarm() && state.getFluidState().is(FluidTags.WATER)) {
-			int i = target.getX();
-			int j = target.getY();
-			int k = target.getZ();
-			world.playSound(null, target, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.5F,
-				2.6F + (world.random.nextFloat() - world.random.nextFloat()) * 0.8F);
+		if (!fluidState.isEmpty() && world.dimensionType().ultraWarm()) {
+			FluidType fluidType = fluidState.getFluidType();
+			FluidStack tempStack = new FluidStack(fluidState.getType(), 1000);
 
-			for (int l = 0; l < 8; ++l) {
-				world.addParticle(ParticleTypes.LARGE_SMOKE, i + Math.random(), j + Math.random(), k + Math.random(),
-					0.0D, 0.0D, 0.0D);
+			if (fluidType.isVaporizedOnPlacement(world, target, tempStack)) {
+
+				fluidType.onVaporize(null, world, target, tempStack);
+
+				if (state.hasProperty(BlockStateProperties.WATERLOGGED)) {
+					state = state.setValue(BlockStateProperties.WATERLOGGED, false);
+				} else {
+					Block.dropResources(state, world, target);
+					return;
+				}
 			}
-			Block.dropResources(state, world, target);
-			return;
 		}
 
 		//noinspection StatementWithEmptyBody

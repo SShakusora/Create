@@ -79,6 +79,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.phys.AABB;
 
 public class StockKeeperRequestScreen extends AbstractSimiContainerScreen<StockKeeperRequestMenu> {
@@ -1469,6 +1470,19 @@ public class StockKeeperRequestScreen extends AbstractSimiContainerScreen<StockK
 		InventorySummary availableItems = blockEntity.getLastClientsideStockSnapshotAsSummary();
 		for (List<ClipboardEntry> list : clipboardItem) {
 			for (ClipboardEntry entry : list) {
+				if (!entry.fluidIcon.isEmpty()) {
+					Fluid fluid = entry.fluidIcon.getFluid();
+					ItemStack bucketStack = new ItemStack(fluid.getBucket());
+					if (bucketStack.isEmpty()) continue;
+
+					int bucketsNeeded = (entry.itemAmount + 999) / 1000;
+					int toOrder = Math.min(bucketsNeeded, availableItems.getCountOf(bucketStack));
+
+					if (toOrder > 0)
+						itemsToOrder.add(new BigItemStack(bucketStack, toOrder));
+					continue;
+				}
+
 				ItemStack stack = entry.icon;
 				int toOrder = Math.min(entry.itemAmount, availableItems.getCountOf(stack));
 				if (toOrder == 0)
