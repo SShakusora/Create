@@ -287,7 +287,7 @@ public class MaterialChecklist {
 			itemsWritten++;
 			FluidStack icon = new FluidStack(fluid, 1000);
 			currentPage.add(new ClipboardEntry(false, fluidEntry(fluid, rem, true, false))
-				.displayItem(icon.isEmpty() ? FluidStack.EMPTY : icon, rem));
+				.displayItem(icon, rem));
 		}
 
 		for (Item item : completed) {
@@ -314,7 +314,7 @@ public class MaterialChecklist {
 			itemsWritten++;
 			FluidStack icon = new FluidStack(fluid, gatheredFluids.getOrDefault(fluid, 0));
 			currentPage.add(new ClipboardEntry(true, fluidEntry(fluid, fluidRequired.getInt(fluid), false, false))
-				.displayItem(icon.isEmpty() ? FluidStack.EMPTY : icon, 0));
+				.displayItem(icon, 0));
 		}
 
 		pages.add(currentPage);

@@ -189,7 +189,7 @@ public class ClipboardScreen extends AbstractSimiScreen {
 				ClipboardEntry clipboardEntry = currentEntries.get(i);
 				String text = clipboardEntry.text.getString();
 				totalHeight +=
-					Math.max(12, font.split(Component.literal(text), clipboardEntry.icon.isEmpty() ? 150 : 130)
+					Math.max(12, font.split(Component.literal(text), clipboardEntry.isIconEmpty() ? 150 : 130)
 						.size() * 9 + 3);
 
 				if (totalHeight > my) {
@@ -289,8 +289,7 @@ public class ClipboardScreen extends AbstractSimiScreen {
 		for (int i = 0; i < currentEntries.size(); i++) {
 			ClipboardEntry clipboardEntry = currentEntries.get(i);
 			boolean checked = clipboardEntry.checked;
-			boolean hasIcon = !clipboardEntry.icon.isEmpty() || !clipboardEntry.fluidIcon.isEmpty();
-			int iconOffset = hasIcon ? 16 : 0;
+			int iconOffset = clipboardEntry.isIconEmpty() ? 0 : 16;
 
 			MutableComponent text = clipboardEntry.text;
 			String string = text.getString();
@@ -315,14 +314,12 @@ public class ClipboardScreen extends AbstractSimiScreen {
 				continue;
 			}
 
-			if (!clipboardEntry.icon.isEmpty())
-				graphics.renderItem(clipboardEntry.icon, x + 54, y + 50);
-
-			if (!clipboardEntry.fluidIcon.isEmpty())
-				GuiGameElement.of(clipboardEntry.fluidIcon.getFluid()).<GuiGameElement
-						.GuiRenderBuilder>at(x + 54, y + 50 + 16, 100)
+			int finalY = y;
+			clipboardEntry.icon.ifLeft(stack -> graphics.renderItem(stack, x + 54, finalY + 50))
+				.ifRight(fluidStack -> GuiGameElement.of(fluidStack.getFluid()).<GuiGameElement
+						.GuiRenderBuilder>at(x + 54, finalY + 50 + 16, 100)
 					.scale(16)
-					.render(graphics);
+					.render(graphics));
 
 			for (FormattedCharSequence sequence : split) {
 				if (i != editingIndex)
