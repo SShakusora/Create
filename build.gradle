@@ -159,6 +159,13 @@ dependencies {
     implementation("dev.ftb.mods:ftb-chunks-neoforge:2101.1.1")
     implementation("dev.ftb.mods:ftb-teams-neoforge:2101.1.0")
     implementation("dev.ftb.mods:ftb-library-neoforge:2101.1.3")
+    //Fluid Test
+    implementation "curse.maven:rhino-416294:7104526"
+    implementation "curse.maven:kubejs-238086:7278501"
+    implementation "curse.maven:probejs-585406:7105159"
+    runtimeOnly "maven.modrinth:cad-editor:0.1.0"
+    runtimeOnly "curse.maven:more-buckets-298760:7180707"
+    runtimeOnly "curse.maven:cucumber-272335:7180790"
 
     implementation("maven.modrinth:journeymap:1.21.1-6.0.0-beta.46+neoforge")
     implementation("info.journeymap:journeymap-api-neoforge:2.0.0-1.21.1-SNAPSHOT") {
