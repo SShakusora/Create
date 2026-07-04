@@ -321,7 +321,7 @@ public class SchematicannonScreen extends AbstractSimiContainerScreen<Schematica
 		} else if (be.missingFluid != null && !be.missingFluid.isEmpty()) {
 			stringWidth += 16;
 			GuiGameElement.of(be.missingFluid.getFluid())
-				.<GuiGameElement.GuiRenderBuilder>at(x + 128, y + 49, 100)
+				.<GuiGameElement.GuiRenderBuilder>at(x + 128, y + 49 + 16, 100)
 				.scale(16)
 				.render(graphics);
 		}
